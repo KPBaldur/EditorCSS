@@ -1,47 +1,117 @@
 
 import React from 'react';
 
+import { useDraggable } from '@dnd-kit/core';
+import { CSS } from '@dnd-kit/utilities';
+
+const DraggableItem: React.FC<{ id: string; name: string; icon: string }> = ({ id, name, icon }) => {
+  const data = React.useMemo(() => ({ type: id }), [id]);
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: `sidebar-${id}`,
+    data,
+  });
+
+  const style = transform ? {
+    transform: CSS.Translate.toString(transform),
+  } : undefined;
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...listeners}
+      {...attributes}
+      className={`group flex items-center gap-3 p-3 bg-panel-dark/50 border border-white/5 rounded-xl hover:border-primary/50 cursor-grab active:cursor-grabbing transition-all hover:bg-panel-dark ${isDragging ? 'opacity-50' : ''}`}
+    >
+      <div className="bg-primary/10 p-2 rounded-lg text-primary transition-colors group-hover:bg-primary/20">
+        <span className="material-symbols-outlined">{icon}</span>
+      </div>
+      <span className="text-xs font-medium text-slate-300 group-hover:text-white">{name}</span>
+    </div>
+  );
+};
+
+import { useEditorStore } from '../store';
+import { EditorComponent } from '../types';
+
+/* ... existing DraggableItem ... */
+
+/* Recursive Structure Item */
+const StructureItem: React.FC<{ component: EditorComponent; level?: number }> = ({ component, level = 0 }) => {
+  const components = useEditorStore((state) => state.components);
+  const selectedId = useEditorStore((state) => state.selectedId);
+  const selectComponent = useEditorStore((state) => state.selectComponent);
+
+  // Find children
+  const children = components.filter(c => c.parentId === component.id);
+  const isSelected = selectedId === component.id;
+
+  return (
+    <div className="flex flex-col">
+      <div
+        onClick={() => selectComponent(component.id)}
+        className={`flex items-center gap-2 text-xs py-1 px-2 rounded cursor-pointer transition-colors ${isSelected ? 'bg-primary/20 text-primary border-r-2 border-primary' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+          }`}
+        style={{ paddingLeft: `${level * 12 + 8}px` }}
+      >
+        <span className="material-symbols-outlined text-[14px] opacity-70">
+          {component.type === 'container' ? 'fit_screen' :
+            component.type === 'button' ? 'smart_button' :
+              component.type === 'image' ? 'image' : 'text_fields'}
+        </span>
+        <span className="truncate flex-1">{component.name}</span>
+        {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>}
+      </div>
+
+      {/* Recursion for children */}
+      {children.length > 0 && (
+        <div className="flex flex-col border-l border-white/5 ml-2">
+          {children.map(child => (
+            <StructureItem key={child.id} component={child} level={level + 1} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const Sidebar: React.FC = () => {
-  const components = [
+  const components = useEditorStore((state) => state.components);
+  const rootComponents = components.filter(c => !c.parentId);
+
+  const tools = [
     { id: 'container', name: 'Container', icon: 'square_foot' },
     { id: 'button', name: 'Action Button', icon: 'smart_button' },
     { id: 'text', name: 'Typography', icon: 'text_fields' },
-    { id: 'media', name: 'Media Block', icon: 'image' },
+    { id: 'image', name: 'Media Block', icon: 'image' },
   ];
 
   return (
-    <aside className="w-64 border-r border-white/5 bg-background-dark flex flex-col shrink-0">
-      <div className="p-6">
-        <h2 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-4">Core Components</h2>
-        <div className="grid grid-cols-1 gap-3">
-          {components.map((comp) => (
-            <div 
-              key={comp.id}
-              className="group flex items-center gap-3 p-3 bg-panel-dark/50 border border-white/5 rounded-xl hover:border-primary/50 cursor-grab active:cursor-grabbing transition-all hover:bg-panel-dark"
-            >
-              <div className="bg-primary/10 p-2 rounded-lg text-primary transition-colors group-hover:bg-primary/20">
-                <span className="material-symbols-outlined">{comp.icon}</span>
-              </div>
-              <span className="text-xs font-medium text-slate-300 group-hover:text-white">{comp.name}</span>
-            </div>
+    <aside className="w-64 border-r border-white/5 bg-background-dark flex flex-col shrink-0 overflow-hidden">
+      <div className="p-6 flex-1 overflow-y-auto custom-scrollbar">
+        <h2 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-4">Lista de Componentes</h2>
+        <div className="grid grid-cols-1 gap-3 mb-8">
+          {tools.map((comp) => (
+            <DraggableItem key={comp.id} {...comp} />
           ))}
         </div>
 
-        <div className="mt-12">
-          <h2 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-4">Structure</h2>
-          <div className="space-y-1">
-            <div className="flex items-center gap-2 text-xs py-1.5 px-2 text-primary bg-primary/5 rounded border-l-2 border-primary">
-              <span className="material-symbols-outlined text-sm">reorder</span>
-              App Container
-            </div>
-            <div className="flex items-center gap-2 text-xs py-1.5 px-6 text-slate-500 hover:text-slate-300 cursor-pointer">
-              <span className="material-symbols-outlined text-sm">subdirectory_arrow_right</span>
-              Hero Section
-            </div>
-            <div className="flex items-center gap-2 text-xs py-1.5 px-6 text-slate-500 hover:text-slate-300 cursor-pointer">
-              <span className="material-symbols-outlined text-sm">subdirectory_arrow_right</span>
-              Features Grid
-            </div>
+        <div className="pt-6 border-t border-white/5">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Estructura</h2>
+            <span className="text-[10px] bg-white/5 text-slate-500 px-1.5 py-0.5 rounded">{components.length}</span>
+          </div>
+
+          <div className="space-y-0.5 min-h-[100px]">
+            {rootComponents.length === 0 ? (
+              <div className="text-center py-8 text-xs text-slate-600 italic">
+                No hay elementos agregados.
+              </div>
+            ) : (
+              rootComponents.map(comp => (
+                <StructureItem key={comp.id} component={comp} />
+              ))
+            )}
           </div>
         </div>
       </div>

@@ -12,6 +12,18 @@ export interface EditorState {
   viewportHeight: number;
 }
 
+export type ComponentType = 'container' | 'button' | 'text' | 'image';
+
+export interface EditorComponent {
+  id: string;
+  type: ComponentType;
+  name: string;
+  props: Record<string, any>;
+  children?: string[]; // IDs of children
+  parentId?: string;
+}
+
+
 export interface ComponentItem {
   id: string;
   name: string;
